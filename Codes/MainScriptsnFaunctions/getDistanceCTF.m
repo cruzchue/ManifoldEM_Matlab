@@ -1,4 +1,4 @@
-function [res] = getDistanceCTF(nStot,ind, q, df, emPar, filterPar, imgFileName, dir,outFile,doTrsl,transFileNameX,transFileNameY,mask,options)
+function [res] = getDistanceCTFercc(nStot,ind, q, df, emPar, filterPar, imgFileName, dir,outFile,doTrsl,transFileNameX,transFileNameY,mask,options)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Copyright (c) 2020 UWM ManifoldEM team 
 % Authors: Peter Schwander 2014, Ali Dahsti 2017, Ghoncheh Mashayekhi 2020
@@ -65,6 +65,11 @@ Psis = nan(nS,1);
 
 imgAvg = zeros(emPar.nPix,emPar.nPix);
 imgAll = zeros(emPar.nPix,emPar.nPix,nS);
+
+%>> ERCC
+imgAvgFlip = zeros(emPar.nPix,emPar.nPix);
+imgAllFlip = zeros(emPar.nPix,emPar.nPix,nS);
+
 
 centers=zeros(nS,2);
 y = zeros((emPar.nPix)^2, nS);
@@ -173,6 +178,12 @@ for iS=1:nS
     % Note: Q is defined in Nyquist and thus must be divided by twice the pixel size
     CTF(:,:,iS) = ifftshift(ctemh_cryoFrank(Q/(2*emPar.dPix),[emPar.Cs,df(iS),emPar.EkV,emPar.gaussEnv])); % ifftshift is correct!
     imgAll(:,:,iS) = img;    
+    
+    %>>> ERCC
+    dummy=ifft2( sign( CTF(:,:,iS)).* fft2(img));
+    imgAvgFlip = imgAvgFlip + dummy;        
+    imgAllFlip(:,:,iS) = dummy;
+    
 end
 clear y;
 
@@ -195,7 +206,8 @@ if exist(dir,'file')==0
     fileattrib(dir,'+w','o');
 end
 
-save([dir,outFile],'CTF','imgAll','D','Psis','imgAvg','-v7.3');
+%>>> ERCC
+save([dir,outFile],'CTF','imgAll','D','Psis','imgAvg','imgAvgFlip', 'imgAllFlip','-v7.3');
 
 res = 'ok';
 
