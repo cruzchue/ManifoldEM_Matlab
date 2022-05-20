@@ -1,4 +1,4 @@
-function [res] = getDistanceCTFercc(nStot,ind, q, df, emPar, filterPar, imgFileName, dir,outFile,doTrsl,transFileNameX,transFileNameY,mask,options)
+function [res] = getDistanceCTFmod01(nStot,ind, q, df, emPar, filterPar, imgFileName, dir,outFile,doTrsl,transFileNameX,transFileNameY,mask,options)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Copyright (c) 2020 UWM ManifoldEM team 
 % Authors: Peter Schwander 2014, Ali Dahsti 2017, Ghoncheh Mashayekhi 2020
@@ -66,7 +66,7 @@ Psis = nan(nS,1);
 imgAvg = zeros(emPar.nPix,emPar.nPix);
 imgAll = zeros(emPar.nPix,emPar.nPix,nS);
 
-%>> ERCC
+%>> ERCC : initialize matrices for phase flip
 imgAvgFlip = zeros(emPar.nPix,emPar.nPix);
 imgAllFlip = zeros(emPar.nPix,emPar.nPix,nS);
 
@@ -113,8 +113,8 @@ for iS=1:nS
 end
         
     
-        
-y= vNorm2(y);
+%>> ERCC : normalization must go after mask, not here        
+%y = vNorm2(y);
 
 % setup mesh for filter
 if mod(emPar.nPix,2)
@@ -140,6 +140,7 @@ G = ifftshift(G);
 GG=repmat(G,1,1,size(y,2));
 y=real(ifft2(GG.*fft2(reshape(y,emPar.nPix,emPar.nPix,size(y,2)))));
 
+
 % Calculate average projection directions
 PDs = 2*[q(2,:).*q(4,:) - q(1,:).*q(3,:); ...
     q(1,:).*q(2,:) + q(3,:).*q(4,:); ...
@@ -151,7 +152,7 @@ PD = sum(PDs,2);
 % make it a unit vector
 PD = PD/sqrt(sum(PD.^2));
 
-
+%>>> ERCC : "SNR" variable is not used
 SNR = 2;
 % rotate images and perform FFT
 for iS=1:nS
@@ -179,19 +180,34 @@ for iS=1:nS
     CTF(:,:,iS) = ifftshift(ctemh_cryoFrank(Q/(2*emPar.dPix),[emPar.Cs,df(iS),emPar.EkV,emPar.gaussEnv])); % ifftshift is correct!
     imgAll(:,:,iS) = img;    
     
-    %>>> ERCC
+    %>>> ERCC : fillig phase-flip matrices
     dummy=ifft2( sign( CTF(:,:,iS)).* fft2(img));
     imgAvgFlip = imgAvgFlip + dummy;        
     imgAllFlip(:,:,iS) = dummy;
     
 end
+
+
 clear y;
 
+
+%>>> ERCC : there are many changes here, normalize after mask
+
 [n1 n2 n3] = size(imgAll);
-mv=mean(imgAll,3);
-mvm=repmat(mv,1,1,n3);
+%mv=mean(imgAll,3);
+%mvm=repmat(mv,1,1,n3);
 mm=repmat(mask,1,1,n3);
-fy=fft2(double((imgAll-mvm).*mm));
+
+imgAllmasked=imgAll.*mm;
+imgAllmaskedLine=reshape(imgAllmasked,n1*n2,n3);
+imgAllmaskedLine=vNorm2(imgAllmaskedLine);
+
+imgAllmasked=reshape(imgAllmaskedLine,n1,n2,n3);
+
+
+%fy=fft2(double((imgAll-mvm).*mm));
+fy=fft2(double(imgAllmasked));
+
 fy = permute(fy,[3,1,2]);
 fy = reshape(fy,n3,n1*n2);
 CTF = reshape(CTF,emPar.nPix^2,nS);
@@ -206,7 +222,14 @@ if exist(dir,'file')==0
     fileattrib(dir,'+w','o');
 end
 
-%>>> ERCC
+%>>> ERCC : apply mask to output
+
+imgAll=imgAll.*mm;
+imgAllFlip=imgAllFlip.*mm;
+
+imgAvg=imgAvg.*mask;
+imgAvgFlip=imgAvgFlip.*mask;
+
 save([dir,outFile],'CTF','imgAll','D','Psis','imgAvg','imgAvgFlip', 'imgAllFlip','-v7.3');
 
 res = 'ok';
