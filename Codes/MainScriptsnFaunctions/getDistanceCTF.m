@@ -137,7 +137,7 @@ end
 
 % Filter images in Fourier space
 G = ifftshift(G);
-GG=repmat(G,1,1,size(y,2)); # ERCC : double check this repmat 
+GG=repmat(G,1,1,size(y,2)); % ERCC : double check this repmat 
 y=real(ifft2(GG.*fft2(reshape(y,emPar.nPix,emPar.nPix,size(y,2)))));
 
 
